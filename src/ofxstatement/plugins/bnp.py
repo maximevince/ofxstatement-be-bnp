@@ -13,8 +13,10 @@ class bnpPlugin(Plugin):
 
     def get_parser(self, filename):
         f = open(filename, 'r', encoding=self.settings.get("charset", "ISO-8859-1"))
-        parser =bnpParser(f)
-        parser.statement.bank_id = "Bnp"
+        parser = bnpParser(f)
+        parser.statement.bank_id = "BNP Paribas Fortis"
+        parser.statement.currency = self.settings["currency"]
+        parser.statement.account_id = self.settings["account"]
         return parser
 
 
@@ -25,9 +27,10 @@ class bnpParser(CsvStatementParser):
     mappings = {
         'check_no': 0,
         'date': 1,
+        'amount': 3,
+        #'currency': 4, -- from ofxstatement 0.7.2
         'payee': 5,
         'memo': 6,
-        'amount': 3
     }
 
     def parse(self):
@@ -48,18 +51,13 @@ class bnpParser(CsvStatementParser):
         return reader
 
     def fix_amount(self, amount):
-        return amount.replace(',', '')
+        return amount.replace(',', '.')
 
     def parse_record(self, line):
         """Parse given transaction line and return StatementLine object
         """
-        transaction_id = line[0]
-        date = line[1]
-        date_value = line[2]
-        account_to = line[5]
-        description = line[6]
-        line[3] = self.fix_amount(line[3])
-        currency = line[3]
+        line[3] = self.fix_amount(line[3]) # amount
+        line[6] = line[6] + " -- MSG: " + line[8] # details + memo
 
         stmtline = super(bnpParser, self).parse_record(line)
         stmtline.trntype = 'DEBIT' if stmtline.amount < 0 else 'CREDIT'
